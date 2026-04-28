@@ -1,0 +1,24 @@
+---
+title: "class_activity"
+format: html
+editor: visual
+---
+
+```{r % precip to streamflow}
+library(here)
+library(tidyverse)
+p301 = read.csv(here("week 1/hw 1/hw1/data", "p301.csv"))
+
+#aggregate by water year
+p301_yearly <- p301 |> 
+  group_by(wy) |>
+  summarise(total_streamflow = sum(streamflow),
+            total_precip = sum(precip),
+            percent_streamflow = (total_streamflow/total_precip) * 100)
+
+#calculate mean, range, and standard deviation of percent streamflow across year
+mean(p301_yearly$percent_streamflow)
+range(p301_yearly$percent_streamflow)
+sd(p301_yearly$percent_streamflow)
+```
+
