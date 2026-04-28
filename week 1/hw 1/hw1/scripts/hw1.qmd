@@ -1,0 +1,113 @@
+---
+title: "HW 1: ESM 262"
+author: Georgia Goldsmith & Poly Shestak
+date: 4-16-26
+format: pdf
+execute:
+  dev: cairo_pdf
+editor: visual
+---
+
+# Analysis 1 - Comparing max streamflow and snowpack
+
+**Motivation:** We were curious to analyze the potential relationship between snowpack and streamflow, with an initial hypothesis being the higher snowpack leads to higher streamflow. We decided to compare the max annual value snowpack and streamflow to deduce any patterns or trends.
+
+**Results:** Snowpack and streamflow were rescaled relative to their maximum values to allow for comparison despite having different units. Both variables show considerable year-to-year variability, with some years where peaks occur at the same time. However, this pattern is not consistent, and there are several years where the two do not align. The years 1994, 1982, and 1972 had the largest differences between streamflow and snowpack. This suggests that while snowpack likely contributes to streamflow, other factors such as precipitation, seasonality, and the timing of snowmelt also influence annual streamflow patterns.
+
+```{r snowpack-streamflow}
+library(here)
+library(tidyverse)
+library(janitor)
+library(ggplot2)
+library(lubridate)
+
+p301 <- read_csv(here("data", "p301.csv"))
+
+stream_snowpack <- p301 |>
+  select("snowpack", "streamflow", "year")
+
+year_avg <- stream_snowpack |>
+  group_by(year) |>
+  summarise(max_streamflow = max(streamflow,
+                                 na.rm = TRUE),
+            max_snowpack = max(snowpack, na.rm = TRUE))
+year_avg
+
+year_avg_indexed <- year_avg |>
+  mutate(
+    streamflow_scaled = max_streamflow / max(max_streamflow, na.rm = TRUE),
+    snowpack_scaled = max_snowpack / max(max_snowpack, na.rm = TRUE))
+
+
+year_avg_indexed_long <- year_avg_indexed |>
+  pivot_longer(
+    cols = c(streamflow_scaled, snowpack_scaled),
+    names_to = "variable",
+    values_to = "value")
+
+
+year_avg_compare <- year_avg |>
+  mutate(
+    streamflow_scaled = max_streamflow / max(max_streamflow, na.rm = TRUE),
+    snowpack_scaled = max_snowpack / max(max_snowpack, na.rm = TRUE),
+    difference = abs(streamflow_scaled - snowpack_scaled))
+
+ggplot(year_avg_indexed_long, aes(x = year, y = value, color = variable)) +
+  geom_line() +
+  geom_point() +
+  scale_color_manual(
+    values = c("snowpack_scaled" = "orange", "streamflow_scaled" = "blue"),
+    labels = c(
+      "snowpack_scaled" = "Snowpack",
+      "streamflow_scaled" = "Streamflow")) +
+  labs(title = "Annual Maximum Streamflow and Snowpack (Rescaled)",
+       x = "Year",
+       y = "Relative Value (0–1 scale)",
+       color = "Measurement") +
+  theme_minimal()
+```
+
+# Analysis 2 lag time between peak precipitation and streamflow
+
+**Motivation:** We were curious to see the lag time between peak precipitation in the biggest rainfall event of the year and the corresponding peak streamflow for that storm. Understanding the variation in lag time is important for river management and flood preparedness.
+
+\
+**Results:** A cross-correlation function was used to estimate how strongly rainfall and streamflow are correlated at each lag time. The lag time with the strongest auto-correlation factor (ACF) was zero days, indicating that streamflow response to rainfall within the same calendar day. These results can indicate that the southern Sierra watershed exhibits steep topography that allows rainfall to quickly runoff into rivers. Another watershed quality it could indicate is that the soil does not have a high infiltration rate (which could be a result of saturation, low porosity, or low vegetation cover, though likely not the latter). However, the ACF at zero was approximately 0.25, which indicates a weak relationship. Additionally, there were many results of negative lag times up to -30 days, which would be impossible. This indicates a lot of noise in the data. It would be better to do this analysis using storm events rather than data that is continuous over the span of many years. Ultimately, despite the lag time of zero exhibiting statistical significance by falling far outside of the 95% confidence interval, the relationship is too weak and the data is too coarse to use this informance to make a hypothesis about certain watershed characteristics. To test how this might work for individual storm events, I selected a single storm event in the dataset in December of 1965. Lag time was calculated to be 1 day.
+
+```{r lag-time}
+ 
+# add date column
+p301$date <- as.Date(with(p301, paste(year, month, day, sep = "-")))
+
+# create data set with only precipitation and stream flow data
+stream_precip <- p301 |>
+  select("precip", "streamflow", "year", "date") |> drop_na()
+
+#estimate lag time
+ccf_res <- ccf(stream_precip$precip,
+               stream_precip$streamflow,
+               lag.max = 30,
+               plot = TRUE,
+               main ="")
+title("Cross-Correlation Between Precipitation and Streamflow")
+
+lag_estimate <- ccf_res$lag[which.max(ccf_res$acf)]
+lag_estimate
+
+# pick a storm event
+event_1965 <- stream_precip %>%
+  filter(date >= as.Date("1965-12-03") &
+         date <= as.Date("1965-12-11"))
+
+#identify peak rainfall and streamflow in the week long window
+rain_peak_65 <- event_1965$date[which.max(event_1965$precip)]
+flow_peak_65 <- event_1965$date[which.max(event_1965$streamflow)]
+
+as.numeric(flow_peak_65 - rain_peak_65)
+
+#determine lag time
+lag_days_1965 <- as.numeric(flow_peak_65 - rain_peak_65)
+lag_days_1965
+               
+
+```
