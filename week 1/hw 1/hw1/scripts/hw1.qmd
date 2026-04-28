@@ -8,7 +8,7 @@ execute:
 editor: visual
 ---
 
-# Analysis 1 - Comparing max streamflow and snowpack
+# Analysis 1: Comparing max streamflow and snowpack
 
 **Motivation:** We were curious to analyze the potential relationship between snowpack and streamflow, with an initial hypothesis being the higher snowpack leads to higher streamflow. We decided to compare the max annual value snowpack and streamflow to deduce any patterns or trends.
 
